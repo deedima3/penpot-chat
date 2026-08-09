@@ -2,6 +2,8 @@
 
 An AI design agent plugin for Penpot. Describe a design from scratch, or select existing layers and ask the assistant to create, refine, align, organize, or remove them. Every request becomes a visible, editable operation plan before it is applied.
 
+The design agent is guided by a product-design and frontend-aware system prompt: it plans a clear visual direction, coherent type/spacing, accessible text contrast, safe artboard padding, and correct layer order. At execution time, generated text is contrast-checked and raised above sibling backgrounds as a final safety net.
+
 ## What it can do
 
 - Create pages, artboards, rectangles, ellipses, text, and safe inline SVG vectors.

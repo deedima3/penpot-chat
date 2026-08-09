@@ -41,3 +41,7 @@ The AI must respond with JSON only:
 ```
 
 The canonical version of this instruction lives in `src/plugin.ts` as `TOOL_CONTRACT`. Update that string whenever the executor gains a tool. Do not advertise a tool that the executor cannot validate and apply.
+
+## Design quality rules sent to the AI
+
+Before creating a plan, the assistant is instructed to work as a senior product designer and frontend-minded design systems engineer. It must establish a single visual direction, use a coherent spacing/type system, build layers in paint order, keep board children inside safe padding, give every text layer an explicit contrasting color, and make text/control layers front-most. The plugin also performs a final text-contrast fallback and brings generated text to the front of sibling backgrounds during execution.

@@ -12,7 +12,17 @@ const ALLOWED_TOOLS = new Set([
   "create_svg", "update_selection", "arrange_selection", "group_selection", "ungroup_selection", "delete_selection"
 ]);
 
-const TOOL_CONTRACT = `You are Canvas Copilot, a careful Penpot design agent. Turn the user's request into a small, editable Penpot execution plan. You do not manipulate pixels or output prose.
+const TOOL_CONTRACT = `You are Canvas Copilot: an exacting senior product designer and frontend-minded design systems engineer working in Penpot. Turn the user's request into a polished, editable Penpot execution plan. You do not manipulate pixels or output prose.
+
+DESIGN INTELLIGENCE
+- Start by committing to one clear visual direction suited to the product and audience: for example editorial, utilitarian, warm minimal, technical, playful, or refined. Do not produce a generic AI dashboard.
+- Think like a strong frontend engineer: establish a responsive artboard, an 8px spacing rhythm, a small reusable palette, deliberate type scale, consistent radii, and logical layer names. Prefer clear sections and a visual hierarchy over decoration.
+- Build in paint order: board/background first; then surfaces, images and decorative geometry; then text; then controls. Never place an opaque background rectangle after its text. Text and controls must be the front-most layers in their parent.
+- Every new text layer MUST declare a fill color. It must visibly contrast with its immediate board or surface: aim for WCAG 4.5:1 or greater for normal text (3:1 only for large display type). Never use the same or nearly the same color for text and its background.
+- For every child with parent:"last_board", keep its x/y position, width, and height inside the board with safe padding: 24px minimum for compact/mobile boards; 48px minimum for desktop boards. No clipped headlines, off-frame labels, accidental overlap, or content behind a surface.
+- Use restrained type hierarchy: a display/headline, supporting body, and utility/label scale. Give text a realistic width; short labels can be auto-sized, while headings and paragraphs need a constrained width. Use intentional line breaks sparingly.
+- Use negative space deliberately. Avoid filling every area. Do not add low-contrast ornament that competes with content. For UI, include clear affordances and preserve a coherent reading order.
+- Before answering, run a silent quality check: all elements are inside their board, text is above its background, every text/background pair has contrast, spacing is consistent, and the composition has one obvious focal point.
 
 You may ONLY use these tools:
 - create_page {name}
@@ -27,7 +37,7 @@ You may ONLY use these tools:
 - ungroup_selection {}
 - delete_selection {}
 
-Rules: use the current selection only for selection tools. For new designs, create a board before its child shapes and use parent:"last_board". Prefer 4–18 operations. Keep every object editable and name layers descriptively. Never use deletion unless expressly requested. The response must be valid JSON only in this exact shape: {"title":"short title","summary":"one sentence","operations":[{"tool":"one tool name","label":"human-readable change","args":{}}]}.`;
+EXECUTION RULES: use the current selection only for selection tools. For new designs, create a board before its child shapes and use parent:"last_board". Prefer 4–18 operations. Keep every object editable and name layers descriptively. Never use deletion unless expressly requested. The response must be valid JSON only in this exact shape: {"title":"short title","summary":"one sentence","operations":[{"tool":"one tool name","label":"human-readable change","args":{}}]}.`;
 
 function summarizeShape(shape: any, depth = 0): Record<string, unknown> {
   const summary: Record<string, unknown> = {
@@ -149,6 +159,38 @@ function setText(shape: any, args: Record<string, any>) {
   if (typeof args.align === "string") shape.align = args.align;
 }
 
+function normalizeHex(color: unknown): string | null {
+  if (typeof color !== "string") return null;
+  const value = color.trim();
+  if (/^#[0-9a-f]{3}$/i.test(value)) return `#${value.slice(1).split("").map((digit) => digit + digit).join("")}`;
+  return /^#[0-9a-f]{6}$/i.test(value) ? value : null;
+}
+function rgb(color: string) {
+  const value = normalizeHex(color); if (!value) return null;
+  return [1, 3, 5].map((index) => parseInt(value.slice(index, index + 2), 16) / 255);
+}
+function luminance(color: string) {
+  const channels = rgb(color); if (!channels) return null;
+  const [r, g, b] = channels.map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrastRatio(foreground: string, background: string) {
+  const fg = luminance(foreground); const bg = luminance(background);
+  return fg === null || bg === null ? null : (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+}
+function fillColor(shape: any) {
+  const fill = Array.isArray(shape?.fills) ? shape.fills.find((entry: any) => typeof entry?.fillColor === "string") : null;
+  return normalizeHex(fill?.fillColor);
+}
+function ensureReadableText(text: any, parent: any) {
+  const background = fillColor(parent) || "#FFFFFF";
+  const current = fillColor(text);
+  if (!current || (contrastRatio(current, background) || 0) < 4.5) {
+    const ink = "#17120F"; const paper = "#FFFAF0";
+    text.fills = hexFill((contrastRatio(ink, background) || 0) >= (contrastRatio(paper, background) || 0) ? ink : paper);
+  }
+}
+
 async function execute(plan: Plan) {
   const created: any[] = [];
   let lastBoard: any = null;
@@ -170,7 +212,8 @@ async function execute(plan: Plan) {
         shape = penpot.createEllipse(); append(shape, resolveParent(args)); setCommon(shape, args); created.push(shape); break;
       }
       case "create_text": {
-        shape = penpot.createText(String(args.text || "Text")); if (!shape) throw new Error("Penpot could not create text."); append(shape, resolveParent(args)); setCommon(shape, args); setText(shape, args); created.push(shape); break;
+        const parent = resolveParent(args);
+        shape = penpot.createText(String(args.text || "Text")); if (!shape) throw new Error("Penpot could not create text."); append(shape, parent); setCommon(shape, args); setText(shape, args); ensureReadableText(shape, parent); created.push(shape); break;
       }
       case "create_svg": {
         const svg = String(args.svg || ""); if (!svg.includes("<svg") || /<script|javascript:|on\w+\s*=/i.test(svg)) throw new Error("Unsafe or invalid SVG was rejected.");
@@ -192,6 +235,9 @@ async function execute(plan: Plan) {
       case "delete_selection": { for (const item of penpot.selection || []) item.remove(); break; }
     }
   }
+  // A model may accidentally describe a later decorative surface. Keep all
+  // generated copy legible and in front of sibling backgrounds regardless.
+  for (const shape of created) if (shape.type === "text") shape.bringToFront();
   if (created.length) penpot.selection = created;
   sendContext();
   return `Applied ${plan.operations.length} operation${plan.operations.length === 1 ? "" : "s"}.`;
