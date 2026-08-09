@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Canvas Copilot</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div class="wordmark"><span class="spark">✦</span> CANVAS / COPILOT</div>
+        <div class="connection"><i></i><span id="connection-label">AI not configured</span></div>
+      </header>
+
+      <section class="hero">
+        <p class="eyebrow">PENPOT DESIGN AGENT</p>
+        <h1>Describe the change.<br /><em>Keep the craft.</em></h1>
+        <p class="lede">Creates a transparent, editable Penpot plan. You review every operation before it touches the canvas.</p>
+      </section>
+
+      <section class="context-card" aria-live="polite">
+        <div class="context-top"><span class="status-dot"></span><span id="selection-title">Reading canvas…</span><button class="text-button" id="refresh-context">Refresh</button></div>
+        <p id="selection-detail">Getting your current selection</p>
+      </section>
+
+      <section class="composer">
+        <label for="prompt">What should change?</label>
+        <textarea id="prompt" rows="5" placeholder="Create a polished mobile checkout screen with a warm editorial feel. Or select layers and ask: make this card system more compact."></textarea>
+        <div class="prompt-footer">
+          <span>⌘↵ to generate</span>
+          <button class="primary" id="generate"><span>Generate plan</span><b>↗</b></button>
+        </div>
+      </section>
+
+      <section class="suggestions" aria-label="Example prompts">
+        <button data-prompt="Create a 1440 × 1024 landing-page hero for a sustainable travel brand. Use a refined cream, ink, and coral palette.">Landing hero</button>
+        <button data-prompt="Turn the selected elements into a consistent card system: 16px corner radius, white surface, subtle border, and 24px internal spacing.">Refine selection</button>
+        <button data-prompt="Create a new page called Design directions with three visual direction boards: Editorial, Utility, and Playful.">Explore directions</button>
+      </section>
+
+      <section id="plan" class="plan is-hidden" aria-live="polite">
+        <div class="plan-heading"><div><p class="eyebrow">PROPOSED EXECUTION</p><h2 id="plan-title">A change plan</h2></div><span class="plan-count" id="plan-count"></span></div>
+        <p id="plan-summary" class="plan-summary"></p>
+        <ol id="operations" class="operations"></ol>
+        <div class="plan-actions"><button class="secondary" id="discard">Discard</button><button class="primary" id="apply">Apply to Penpot <b>↗</b></button></div>
+      </section>
+
+      <section class="guide">
+        <button class="guide-trigger" id="guide-toggle" aria-expanded="false"><span>AI tool contract</span><span>⌄</span></button>
+        <div class="guide-body" id="guide-body" hidden>
+          <p>The assistant receives your page and selection summary, then can only propose these editable Penpot tools:</p>
+          <div class="tool-grid">
+            <code>create_page</code><code>create_board</code><code>create_rectangle</code><code>create_ellipse</code><code>create_text</code><code>create_svg</code><code>update_selection</code><code>arrange_selection</code><code>group_selection</code><code>ungroup_selection</code><code>delete_selection</code>
+          </div>
+          <p>Its response must be JSON. The plugin validates it, presents it here, and only executes after you press <strong>Apply to Penpot</strong>.</p>
+        </div>
+      </section>
+
+      <section class="settings">
+        <button class="guide-trigger" id="settings-toggle" aria-expanded="false"><span>AI connection</span><span>⌄</span></button>
+        <div class="settings-body" id="settings-body" hidden>
+          <p>Use an OpenAI-compatible chat-completions endpoint. Your key is stored only in this plugin’s local storage.</p>
+          <label>Endpoint <input id="endpoint" type="url" value="https://api.openai.com/v1/chat/completions" /></label>
+          <label>Model <input id="model" type="text" value="gpt-4.1-mini" /></label>
+          <label>API key <input id="api-key" type="password" autocomplete="off" placeholder="sk-…" /></label>
+          <button class="secondary save-settings" id="save-settings">Save connection</button>
+        </div>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
