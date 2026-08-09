@@ -37,7 +37,11 @@ jobs:
         run: npm run build
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
+        with:
+          # First deployment: create the Pages site and select GitHub Actions
+          # as the publishing source if it has not yet been enabled in Settings.
+          enablement: true
 
       - name: Upload plugin bundle
         uses: actions/upload-pages-artifact@v3
