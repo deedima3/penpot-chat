@@ -33,6 +33,8 @@ Start LM Studio's server from its **Developer** tab, then open **AI connection**
 
 Canvas Copilot requests a JSON Schema response from LM Studio, so use a model that supports structured output/tool use for the most reliable design plans.
 
+After an update, remove the existing Canvas Copilot entry in Penpot's Plugin Manager and install the manifest URL again. The manifest includes a versioned plugin bundle URL so Penpot fetches the current build instead of its previously cached script.
+
 ## Deploy with GitHub Pages
 
 The production bundle is committed in `docs/`, which GitHub Pages can serve directly from the repository—no Actions deployment token is needed.
