@@ -5,6 +5,7 @@ declare const penpot: any;
 
 type Operation = { tool: string; args?: Record<string, any>; label?: string };
 type Plan = { title: string; summary: string; operations: Operation[] };
+type AgentReply = Plan & { status: "continue" | "complete"; reason: string };
 
 const UI_SIZE = { width: 456, height: 760 };
 const ALLOWED_TOOLS = new Set([
@@ -37,7 +38,9 @@ You may ONLY use these tools:
 - ungroup_selection {}
 - delete_selection {}
 
-EXECUTION RULES: use the current selection only for selection tools. For new designs, create a board before its child shapes and use parent:"last_board". Prefer 4–18 operations. Keep every object editable and name layers descriptively. Never use deletion unless expressly requested. The response must be valid JSON only in this exact shape: {"title":"short title","summary":"one sentence","operations":[{"tool":"one tool name","label":"human-readable change","args":{}}]}.`;
+EXECUTION RULES: use the current selection only for selection tools. For new designs, create a board before its child shapes and use parent:"last_board". Prefer 4–18 operations. Keep every object editable and name layers descriptively. Never use deletion unless expressly requested.
+
+AUTONOMOUS AGENT LOOP: You are called repeatedly with a fresh canvas snapshot. On each pass, inspect the actual state, choose the smallest useful batch, and respond with JSON only: {"status":"continue"|"complete","reason":"short evidence-based status","title":"short title","summary":"one sentence","operations":[{"tool":"one tool name","label":"human-readable change","args":{}}]}. Use status "continue" with 1–18 operations when the goal is not yet met. Use status "complete" with an empty operations array only after the visible canvas satisfies the user’s goal and all quality checks pass. Do not claim completion merely because you created a first draft; inspect the latest canvas and improve it if hierarchy, containment, contrast, or layering is still weak.`;
 
 function summarizeShape(shape: any, depth = 0): Record<string, unknown> {
   const summary: Record<string, unknown> = {
@@ -83,7 +86,23 @@ function validatePlan(value: unknown): Plan {
   return { title: String(plan.title || "Proposed canvas change"), summary: String(plan.summary || ""), operations: plan.operations };
 }
 
-async function askAI(message: any) {
+function validateAgentReply(value: unknown): AgentReply {
+  if (!value || typeof value !== "object") throw new Error("AI did not return a JSON object.");
+  const reply = value as Partial<AgentReply>;
+  if (reply.status !== "continue" && reply.status !== "complete") throw new Error("Agent response is missing a valid status.");
+  const operations = Array.isArray(reply.operations) ? reply.operations : null;
+  if (!operations) throw new Error("Agent response is missing operations.");
+  if (operations.length > 18) throw new Error("The agent batch is too large (max 18 operations).");
+  if (reply.status === "continue" && operations.length === 0) throw new Error("The agent cannot continue without a canvas change.");
+  if (reply.status === "complete" && operations.length > 0) throw new Error("A completed agent response must not contain more changes.");
+  for (const operation of operations) {
+    if (!operation || !ALLOWED_TOOLS.has(operation.tool)) throw new Error(`Unsupported AI tool: ${operation?.tool || "unknown"}`);
+    if (operation.args !== undefined && (typeof operation.args !== "object" || Array.isArray(operation.args))) throw new Error(`Invalid arguments for ${operation.tool}.`);
+  }
+  return { status: reply.status, reason: String(reply.reason || ""), title: String(reply.title || "Canvas update"), summary: String(reply.summary || ""), operations };
+}
+
+async function askAI(message: any, autonomous = false): Promise<Plan | AgentReply> {
   const { prompt, settings } = message;
   const localLmStudio = /^https?:\/\/(localhost|127\.0\.0\.1):1234\/v1\//.test(settings?.endpoint || "");
   if (!settings?.endpoint || !settings?.model || (!settings?.apiKey && !localLmStudio)) throw new Error("Add an endpoint, model, and API key—or connect LM Studio local mode—first.");
@@ -100,7 +119,7 @@ async function askAI(message: any) {
     temperature: 0.35,
     messages: [
       { role: "system", content: TOOL_CONTRACT },
-      { role: "user", content: `Canvas context:\n${JSON.stringify(context)}\n\nDesign request:\n${String(prompt)}` }
+      { role: "user", content: `Canvas context (this is the source of truth):\n${JSON.stringify(context)}\n\nDesign request:\n${String(prompt)}${autonomous ? `\n\nAutonomous pass: ${message.iteration || 1}. Inspect this latest canvas, make only the next necessary batch, then report continue or complete.` : ""}` }
     ]
   };
   // LM Studio defaults to text output. The tool contract requires JSON and
@@ -116,7 +135,8 @@ async function askAI(message: any) {
   const payload = await response.json();
   const content = payload?.choices?.[0]?.message?.content;
   if (typeof content !== "string") throw new Error("The AI endpoint returned no chat-completions message.");
-  return validatePlan(cleanJson(content));
+  const parsed = cleanJson(content);
+  return autonomous ? validateAgentReply(parsed) : validatePlan(parsed);
 }
 
 async function listLmStudioModels(endpoint: string) {
@@ -276,11 +296,37 @@ async function execute(plan: Plan) {
   return `Applied ${plan.operations.length} operation${plan.operations.length === 1 ? "" : "s"}.`;
 }
 
+let activeAgentRun = 0;
+function agentProgress(iteration: number, phase: string, detail: string) {
+  penpot.ui.sendMessage({ source: "canvas-copilot", type: "agent-progress", iteration, phase, detail });
+}
+async function runAutonomousAgent(message: any) {
+  const runId = ++activeAgentRun;
+  const maximumPasses = 6;
+  for (let iteration = 1; iteration <= maximumPasses; iteration += 1) {
+    if (runId !== activeAgentRun) return;
+    agentProgress(iteration, "inspecting", "Reading the latest canvas state and deciding the next small batch.");
+    const reply = await askAI({ ...message, iteration }, true) as AgentReply;
+    if (runId !== activeAgentRun) return;
+    if (reply.status === "complete") {
+      penpot.ui.sendMessage({ source: "canvas-copilot", type: "agent-complete", message: reply.reason || "Goal complete after checking the canvas." });
+      return;
+    }
+    agentProgress(iteration, "applying", reply.summary || `${reply.operations.length} canvas changes`);
+    await execute(reply);
+    if (runId !== activeAgentRun) return;
+    agentProgress(iteration, "checking", "Changes applied. Re-inspecting the result before the next pass.");
+  }
+  if (runId === activeAgentRun) penpot.ui.sendMessage({ source: "canvas-copilot", type: "agent-complete", message: "Stopped after 6 passes. Review the canvas and run again if you want another refinement pass." });
+}
+
 penpot.ui.open("Canvas Copilot", `?theme=${penpot.theme}`, UI_SIZE);
 penpot.ui.onMessage(async (message: any) => {
   try {
     if (message?.type === "get-context") sendContext();
     else if (message?.type === "request-ai") penpot.ui.sendMessage({ source: "canvas-copilot", type: "ai-result", plan: await askAI(message) });
+    else if (message?.type === "run-agent") await runAutonomousAgent(message);
+    else if (message?.type === "stop-agent") { activeAgentRun += 1; penpot.ui.sendMessage({ source: "canvas-copilot", type: "agent-stopped" }); }
     else if (message?.type === "list-lmstudio-models") penpot.ui.sendMessage({ source: "canvas-copilot", type: "lmstudio-models", models: await listLmStudioModels(message.endpoint) });
     else if (message?.type === "apply-plan") penpot.ui.sendMessage({ source: "canvas-copilot", type: "apply-result", message: await execute(validatePlan(message.plan)) });
   } catch (error) {

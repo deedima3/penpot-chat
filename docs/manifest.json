@@ -2,7 +2,7 @@
   "name": "Canvas Copilot",
   "description": "Plan, create, and refine editable Penpot designs with any OpenAI-compatible AI endpoint.",
   "version": 2,
-  "code": "plugin-layering-safe-5.js",
+  "code": "plugin-autopilot-6.js",
   "icon": "icon.svg",
   "permissions": ["content:write", "allow:localstorage"]
 }

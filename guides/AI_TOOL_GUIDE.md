@@ -47,3 +47,7 @@ The canonical version of this instruction lives in `src/plugin.ts` as `TOOL_CONT
 Before creating a plan, the assistant is instructed to work as a senior product designer and frontend-minded design systems engineer. It must establish a single visual direction, use a coherent spacing/type system, build layers in paint order, keep board children inside safe padding, give every text layer an explicit contrasting color, and make text/control layers front-most. The plugin also performs a final text-contrast fallback and brings generated text to the front of sibling backgrounds during execution.
 
 Every new shape can now declare `layer` as `frame`, `background`, `decoration`, `surface`, `content`, `control`, or `text`. The executor reorders all generated siblings into that sequence after the plan runs. If the AI omits a role, the executor safely infers one from the shape type and layer name.
+
+## Autonomous execution loop
+
+When the designer chooses **Run to goal**, the model must return `status: "continue"` with a small batch of operations, or `status: "complete"` with no operations. After each `continue` batch, Canvas Copilot applies it, re-reads the page and selection, and invokes the model again with this fresh context. The loop is capped at six passes and can be stopped by the designer. This makes the AI act like a bounded design-agent harness instead of a one-shot planner.

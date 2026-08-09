@@ -4,6 +4,10 @@ An AI design agent plugin for Penpot. Describe a design from scratch, or select 
 
 The design agent is guided by a product-design and frontend-aware system prompt: it plans a clear visual direction, coherent type/spacing, accessible text contrast, safe artboard padding, and explicit layer roles. At execution time, generated siblings are deterministically reordered from frame/background through surfaces and controls to text, with a final text-contrast safety net.
 
+## Autonomous agent mode
+
+Click **Run to goal** to start an agent loop rather than a one-shot design plan. The agent receives the current canvas state, applies a small batch of tools, re-reads the resulting canvas, and continues until it can verify the goal or reaches its six-pass safety cap. You can stop a run at any time; already-applied changes remain editable in Penpot.
+
 ## What it can do
 
 - Create pages, artboards, rectangles, ellipses, text, and safe inline SVG vectors.

@@ -22,8 +22,9 @@ function settings(): Settings { return { endpoint: inputs.endpoint.value.trim(),
 function isLmStudio(connection: Settings = settings()) { return /^https?:\/\/(localhost|127\.0\.0\.1):1234\/v1\//.test(connection.endpoint); }
 function isConfigured(connection: Settings = settings()) { return Boolean(connection.endpoint && connection.model && (connection.apiKey || isLmStudio(connection))); }
 function updateConnectionLabel() { const connection = settings(); $("#connection-label").textContent = isConfigured(connection) ? `${isLmStudio(connection) ? "Local ·" : "Ready ·"} ${connection.model}` : "AI not configured"; }
-function setWorking(working: boolean, label = "Generate plan") {
+function setWorking(working: boolean, label = "Run to goal") {
   isWorking = working; const button = $("#generate") as HTMLButtonElement; button.disabled = working; button.querySelector("span")!.textContent = label;
+  $("#agent-run").toggleAttribute("hidden", !working); ($("#stop-agent") as HTMLButtonElement).disabled = !working;
 }
 function saveSettings() {
   localStorage.setItem("canvas-copilot-settings", JSON.stringify(settings()));
@@ -49,12 +50,14 @@ function generate() {
   if (isWorking) return;
   if (!prompt.value.trim()) return notify("Describe a design or select layers to refine.", "is-error");
   const connection = settings(); if (!isConfigured(connection)) return notify("Set up an AI connection, or use LM Studio local mode.", "is-error");
-  setWorking(true, "Thinking…"); send({ type: "request-ai", prompt: prompt.value.trim(), settings: connection });
+  setWorking(true, "Agent is starting…"); $("#agent-status").textContent = "Agent is reading the canvas"; $("#agent-detail").textContent = "It will keep iterating until the goal is met, or it reaches its safety limit.";
+  send({ type: "run-agent", prompt: prompt.value.trim(), settings: connection });
 }
 
 $("#generate").addEventListener("click", generate);
 prompt.addEventListener("keydown", (event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") generate(); });
 $("#save-settings").addEventListener("click", saveSettings);
+$("#stop-agent").addEventListener("click", () => { send({ type: "stop-agent" }); $("#agent-status").textContent = "Stopping after this step…"; });
 $("#lmstudio-connect").addEventListener("click", () => {
   inputs.endpoint.value = "http://localhost:1234/v1/chat/completions";
   inputs.apiKey.value = "";
@@ -75,6 +78,13 @@ window.addEventListener("message", (event) => {
     const selected = message.context.selection || []; $("#selection-title").textContent = selected.length ? `${selected.length} layer${selected.length === 1 ? "" : "s"} selected` : `Page: ${message.context.page?.name || "Untitled"}`;
     $("#selection-detail").textContent = selected.length ? selected.map((layer: any) => `${layer.name || layer.type} · ${layer.width}×${layer.height}`).join("  /  ") : `${(message.context.topLevel || []).length} top-level layers available to the assistant`;
   } else if (message.type === "ai-result") { setWorking(false); renderPlan(message.plan); }
+  else if (message.type === "agent-progress") {
+    $("#agent-status").textContent = `Pass ${message.iteration} · ${message.phase}`;
+    $("#agent-detail").textContent = message.detail || "Working on the current canvas state…";
+    setWorking(true, "Agent is working…");
+  }
+  else if (message.type === "agent-complete") { setWorking(false); notify(message.message || "Goal complete."); }
+  else if (message.type === "agent-stopped") { setWorking(false); notify("Agent stopped. Changes already applied were kept."); }
   else if (message.type === "lmstudio-models") {
     const models = Array.isArray(message.models) ? message.models : [];
     if (!models.length) return notify("LM Studio is running, but no models are loaded.", "is-error");

@@ -16,7 +16,7 @@ export default defineConfig({
         plugin: "src/plugin.ts"
       },
       output: {
-        entryFileNames: (chunk) => (chunk.name === "plugin" ? "plugin-layering-safe-5.js" : "assets/[name]-[hash].js")
+        entryFileNames: (chunk) => (chunk.name === "plugin" ? "plugin-autopilot-6.js" : "assets/[name]-[hash].js")
       }
     }
   },

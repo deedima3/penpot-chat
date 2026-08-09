@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Canvas Copilot</title>
-    <script type="module" crossorigin src="./assets/index-uGD8odnG.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CHbjn94S.css">
+    <script type="module" crossorigin src="./assets/index-BNPDbzkV.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BUtnYgjl.css">
   </head>
   <body>
     <main class="shell">
@@ -17,7 +17,7 @@
       <section class="hero">
         <p class="eyebrow">PENPOT DESIGN AGENT</p>
         <h1>Describe the change.<br /><em>Keep the craft.</em></h1>
-        <p class="lede">Creates a transparent, editable Penpot plan. You review every operation before it touches the canvas.</p>
+        <p class="lede">An autonomous canvas agent: it inspects, builds, checks its work, then continues until your goal is complete.</p>
       </section>
 
       <section class="context-card" aria-live="polite">
@@ -29,9 +29,14 @@
         <label for="prompt">What should change?</label>
         <textarea id="prompt" rows="5" placeholder="Create a polished mobile checkout screen with a warm editorial feel. Or select layers and ask: make this card system more compact."></textarea>
         <div class="prompt-footer">
-          <span>⌘↵ to generate</span>
-          <button class="primary" id="generate"><span>Generate plan</span><b>↗</b></button>
+          <span>⌘↵ to run</span>
+          <button class="primary" id="generate"><span>Run to goal</span><b>↗</b></button>
         </div>
+      </section>
+
+      <section class="agent-run" id="agent-run" hidden aria-live="polite">
+        <div class="agent-pulse"><i></i><div><strong id="agent-status">Agent is inspecting the canvas</strong><small id="agent-detail">It will apply small batches and check the result after each one.</small></div></div>
+        <button class="secondary agent-stop" id="stop-agent">Stop agent</button>
       </section>
 
       <section class="suggestions" aria-label="Example prompts">
@@ -54,7 +59,7 @@
           <div class="tool-grid">
             <code>create_page</code><code>create_board</code><code>create_rectangle</code><code>create_ellipse</code><code>create_text</code><code>create_svg</code><code>update_selection</code><code>arrange_selection</code><code>group_selection</code><code>ungroup_selection</code><code>delete_selection</code>
           </div>
-          <p>Its response must be JSON. The plugin validates it, presents it here, and only executes after you press <strong>Apply to Penpot</strong>.</p>
+          <p>Its response must be JSON. In autonomous mode, the plugin validates each small batch, applies it, re-reads the canvas, and asks the AI whether the goal is complete. The run is user-started, cancellable, and capped at six passes.</p>
         </div>
       </section>
 
