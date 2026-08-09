@@ -16,7 +16,7 @@ export default defineConfig({
         plugin: "src/plugin.ts"
       },
       output: {
-        entryFileNames: (chunk) => (chunk.name === "plugin" ? "plugin.js" : "assets/[name]-[hash].js")
+        entryFileNames: (chunk) => (chunk.name === "plugin" ? "plugin-lmstudio-schema-1.js" : "assets/[name]-[hash].js")
       }
     }
   },
