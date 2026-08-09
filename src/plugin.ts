@@ -197,7 +197,7 @@ function inferLayerRole(layer: CreatedLayer) {
   if (layer.tool === "create_board") return "frame";
   if (layer.tool === "create_text") return "text";
   const explicit = String(layer.args.layer || "").toLowerCase();
-  if (explicit in LAYER_PRIORITY) return explicit;
+  if (Object.hasOwn(LAYER_PRIORITY, explicit)) return explicit;
   const name = String(layer.args.name || "").toLowerCase();
   if (/background|\bbg\b|backdrop|base/.test(name)) return "background";
   if (/ornament|decoration|glow|blob|texture|spark|pattern/.test(name)) return "decoration";
@@ -208,6 +208,9 @@ function inferLayerRole(layer: CreatedLayer) {
 function applyGeneratedLayerOrder(created: CreatedLayer[]) {
   const byParent = new Map<any, CreatedLayer[]>();
   for (const layer of created) {
+    // Frames live at the page root. Reordering root-level frames can be
+    // rejected by Penpot; only order the content that belongs to a new board.
+    if (layer.args.parent !== "last_board") continue;
     const parent = layer.shape.parent || penpot.currentPage.root;
     const siblings = byParent.get(parent) || []; siblings.push(layer); byParent.set(parent, siblings);
   }
@@ -215,7 +218,10 @@ function applyGeneratedLayerOrder(created: CreatedLayer[]) {
     // Moving low-priority siblings to the front first and high-priority ones
     // last produces a deterministic back-to-front stack in Penpot.
     siblings.sort((a, b) => LAYER_PRIORITY[inferLayerRole(a)] - LAYER_PRIORITY[inferLayerRole(b)] || a.order - b.order);
-    for (const layer of siblings) layer.shape.bringToFront();
+    for (const layer of siblings) {
+      // A layer-order failure must never discard an otherwise valid design.
+      try { if (typeof layer.shape.bringToFront === "function") layer.shape.bringToFront(); } catch { /* retain Penpot's native order */ }
+    }
   }
 }
 
