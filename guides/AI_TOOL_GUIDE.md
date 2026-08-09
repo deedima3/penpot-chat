@@ -45,3 +45,5 @@ The canonical version of this instruction lives in `src/plugin.ts` as `TOOL_CONT
 ## Design quality rules sent to the AI
 
 Before creating a plan, the assistant is instructed to work as a senior product designer and frontend-minded design systems engineer. It must establish a single visual direction, use a coherent spacing/type system, build layers in paint order, keep board children inside safe padding, give every text layer an explicit contrasting color, and make text/control layers front-most. The plugin also performs a final text-contrast fallback and brings generated text to the front of sibling backgrounds during execution.
+
+Every new shape can now declare `layer` as `frame`, `background`, `decoration`, `surface`, `content`, `control`, or `text`. The executor reorders all generated siblings into that sequence after the plan runs. If the AI omits a role, the executor safely infers one from the shape type and layer name.

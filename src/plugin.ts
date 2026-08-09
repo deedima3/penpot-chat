@@ -17,7 +17,7 @@ const TOOL_CONTRACT = `You are Canvas Copilot: an exacting senior product design
 DESIGN INTELLIGENCE
 - Start by committing to one clear visual direction suited to the product and audience: for example editorial, utilitarian, warm minimal, technical, playful, or refined. Do not produce a generic AI dashboard.
 - Think like a strong frontend engineer: establish a responsive artboard, an 8px spacing rhythm, a small reusable palette, deliberate type scale, consistent radii, and logical layer names. Prefer clear sections and a visual hierarchy over decoration.
-- Build in paint order: board/background first; then surfaces, images and decorative geometry; then text; then controls. Never place an opaque background rectangle after its text. Text and controls must be the front-most layers in their parent.
+- Build in paint order and declare a layer role on EVERY create operation: frame, background, decoration, surface, content, control, or text. The required stack is frame → background → decoration → surface → content → control → text. Never place an opaque background rectangle after its text. Text and controls must be the front-most layers in their parent.
 - Every new text layer MUST declare a fill color. It must visibly contrast with its immediate board or surface: aim for WCAG 4.5:1 or greater for normal text (3:1 only for large display type). Never use the same or nearly the same color for text and its background.
 - For every child with parent:"last_board", keep its x/y position, width, and height inside the board with safe padding: 24px minimum for compact/mobile boards; 48px minimum for desktop boards. No clipped headlines, off-frame labels, accidental overlap, or content behind a surface.
 - Use restrained type hierarchy: a display/headline, supporting body, and utility/label scale. Give text a realistic width; short labels can be auto-sized, while headings and paragraphs need a constrained width. Use intentional line breaks sparingly.
@@ -26,11 +26,11 @@ DESIGN INTELLIGENCE
 
 You may ONLY use these tools:
 - create_page {name}
-- create_board {name,x,y,width,height,fill?,radius?}
-- create_rectangle {name,x,y,width,height,fill?,radius?,stroke?,parent?}; parent may be "last_board".
-- create_ellipse {name,x,y,width,height,fill?,stroke?,parent?}; parent may be "last_board".
-- create_text {name,text,x,y,width?,height?,fontFamily?,fontSize?,fontWeight?,fill?,align?,parent?}; parent may be "last_board".
-- create_svg {name,svg,x?,y?,parent?}; SVG must be simple, safe inline SVG only and no scripts/external URLs.
+- create_board {name,x,y,width,height,fill?,radius?,layer:"frame"}
+- create_rectangle {name,x,y,width,height,fill?,radius?,stroke?,parent?,layer?}; parent may be "last_board".
+- create_ellipse {name,x,y,width,height,fill?,stroke?,parent?,layer?}; parent may be "last_board".
+- create_text {name,text,x,y,width?,height?,fontFamily?,fontSize?,fontWeight?,fill?,align?,parent?,layer:"text"}; parent may be "last_board".
+- create_svg {name,svg,x?,y?,parent?,layer?}; SVG must be simple, safe inline SVG only and no scripts/external URLs.
 - update_selection {properties}; properties may contain name,x,y,width,height,rotation,opacity,visible,fill,stroke,radius,text,fontFamily,fontSize,fontWeight,align.
 - arrange_selection {action}; action is bring_to_front, bring_forward, send_to_back, send_backward, align_left, align_center, align_right, align_top, align_middle, align_bottom, distribute_horizontal, or distribute_vertical.
 - group_selection {}
@@ -191,10 +191,39 @@ function ensureReadableText(text: any, parent: any) {
   }
 }
 
+type CreatedLayer = { shape: any; tool: string; args: Record<string, any>; order: number };
+const LAYER_PRIORITY: Record<string, number> = { frame: 0, background: 1, decoration: 2, surface: 3, content: 4, control: 5, text: 6 };
+function inferLayerRole(layer: CreatedLayer) {
+  if (layer.tool === "create_board") return "frame";
+  if (layer.tool === "create_text") return "text";
+  const explicit = String(layer.args.layer || "").toLowerCase();
+  if (explicit in LAYER_PRIORITY) return explicit;
+  const name = String(layer.args.name || "").toLowerCase();
+  if (/background|\bbg\b|backdrop|base/.test(name)) return "background";
+  if (/ornament|decoration|glow|blob|texture|spark|pattern/.test(name)) return "decoration";
+  if (/card|panel|surface|modal|sheet|container/.test(name)) return "surface";
+  if (/button|cta|input|field|tab|toggle|control/.test(name)) return "control";
+  return "content";
+}
+function applyGeneratedLayerOrder(created: CreatedLayer[]) {
+  const byParent = new Map<any, CreatedLayer[]>();
+  for (const layer of created) {
+    const parent = layer.shape.parent || penpot.currentPage.root;
+    const siblings = byParent.get(parent) || []; siblings.push(layer); byParent.set(parent, siblings);
+  }
+  for (const siblings of byParent.values()) {
+    // Moving low-priority siblings to the front first and high-priority ones
+    // last produces a deterministic back-to-front stack in Penpot.
+    siblings.sort((a, b) => LAYER_PRIORITY[inferLayerRole(a)] - LAYER_PRIORITY[inferLayerRole(b)] || a.order - b.order);
+    for (const layer of siblings) layer.shape.bringToFront();
+  }
+}
+
 async function execute(plan: Plan) {
-  const created: any[] = [];
+  const created: CreatedLayer[] = [];
   let lastBoard: any = null;
   const resolveParent = (args: Record<string, any>) => args.parent === "last_board" ? lastBoard : null;
+  const track = (shape: any, tool: string, args: Record<string, any>) => created.push({ shape, tool, args, order: created.length });
   for (const operation of plan.operations) {
     const args = operation.args || {};
     let shape: any;
@@ -203,21 +232,21 @@ async function execute(plan: Plan) {
         const page = penpot.createPage(); page.name = String(args.name || "New page"); await penpot.openPage(page); lastBoard = null; break;
       }
       case "create_board": {
-        shape = penpot.createBoard(); append(shape, null); setCommon(shape, args); lastBoard = shape; created.push(shape); break;
+        shape = penpot.createBoard(); append(shape, null); setCommon(shape, args); lastBoard = shape; track(shape, operation.tool, args); break;
       }
       case "create_rectangle": {
-        shape = penpot.createRectangle(); append(shape, resolveParent(args)); setCommon(shape, args); created.push(shape); break;
+        shape = penpot.createRectangle(); append(shape, resolveParent(args)); setCommon(shape, args); track(shape, operation.tool, args); break;
       }
       case "create_ellipse": {
-        shape = penpot.createEllipse(); append(shape, resolveParent(args)); setCommon(shape, args); created.push(shape); break;
+        shape = penpot.createEllipse(); append(shape, resolveParent(args)); setCommon(shape, args); track(shape, operation.tool, args); break;
       }
       case "create_text": {
         const parent = resolveParent(args);
-        shape = penpot.createText(String(args.text || "Text")); if (!shape) throw new Error("Penpot could not create text."); append(shape, parent); setCommon(shape, args); setText(shape, args); ensureReadableText(shape, parent); created.push(shape); break;
+        shape = penpot.createText(String(args.text || "Text")); if (!shape) throw new Error("Penpot could not create text."); append(shape, parent); setCommon(shape, args); setText(shape, args); ensureReadableText(shape, parent); track(shape, operation.tool, args); break;
       }
       case "create_svg": {
         const svg = String(args.svg || ""); if (!svg.includes("<svg") || /<script|javascript:|on\w+\s*=/i.test(svg)) throw new Error("Unsafe or invalid SVG was rejected.");
-        shape = penpot.createShapeFromSvg(svg); if (!shape) throw new Error("Penpot could not create the SVG."); append(shape, resolveParent(args)); setCommon(shape, args); created.push(shape); break;
+        shape = penpot.createShapeFromSvg(svg); if (!shape) throw new Error("Penpot could not create the SVG."); append(shape, resolveParent(args)); setCommon(shape, args); track(shape, operation.tool, args); break;
       }
       case "update_selection": {
         for (const selected of penpot.selection || []) { setCommon(selected, args.properties || {}); if (selected.type === "text") setText(selected, args.properties || {}); } break;
@@ -230,15 +259,13 @@ async function execute(plan: Plan) {
         else for (const item of selected) ({ bring_to_front: () => item.bringToFront(), bring_forward: () => item.bringForward(), send_to_back: () => item.sendToBack(), send_backward: () => item.sendBackward() } as Record<string, () => void>)[action]?.();
         break;
       }
-      case "group_selection": { const group = penpot.group(penpot.selection || []); if (group) created.push(group); break; }
+      case "group_selection": { const group = penpot.group(penpot.selection || []); if (group) track(group, operation.tool, args); break; }
       case "ungroup_selection": { for (const item of penpot.selection || []) if (penpot.utils.types.isGroup(item)) penpot.ungroup(item); break; }
       case "delete_selection": { for (const item of penpot.selection || []) item.remove(); break; }
     }
   }
-  // A model may accidentally describe a later decorative surface. Keep all
-  // generated copy legible and in front of sibling backgrounds regardless.
-  for (const shape of created) if (shape.type === "text") shape.bringToFront();
-  if (created.length) penpot.selection = created;
+  applyGeneratedLayerOrder(created);
+  if (created.length) penpot.selection = created.map((layer) => layer.shape);
   sendContext();
   return `Applied ${plan.operations.length} operation${plan.operations.length === 1 ? "" : "s"}.`;
 }

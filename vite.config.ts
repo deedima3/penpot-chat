@@ -16,7 +16,7 @@ export default defineConfig({
         plugin: "src/plugin.ts"
       },
       output: {
-        entryFileNames: (chunk) => (chunk.name === "plugin" ? "plugin-design-quality-3.js" : "assets/[name]-[hash].js")
+        entryFileNames: (chunk) => (chunk.name === "plugin" ? "plugin-layering-4.js" : "assets/[name]-[hash].js")
       }
     }
   },
