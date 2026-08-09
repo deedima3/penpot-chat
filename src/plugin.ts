@@ -12,31 +12,6 @@ const ALLOWED_TOOLS = new Set([
   "create_svg", "update_selection", "arrange_selection", "group_selection", "ungroup_selection", "delete_selection"
 ]);
 
-const LM_STUDIO_PLAN_SCHEMA = {
-  name: "penpot_execution_plan",
-  strict: false,
-  schema: {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      summary: { type: "string" },
-      operations: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            tool: { type: "string", enum: [...ALLOWED_TOOLS] },
-            label: { type: "string" },
-            args: { type: "object" }
-          },
-          required: ["tool", "args"]
-        }
-      }
-    },
-    required: ["title", "summary", "operations"]
-  }
-};
-
 const TOOL_CONTRACT = `You are Canvas Copilot, a careful Penpot design agent. Turn the user's request into a small, editable Penpot execution plan. You do not manipulate pixels or output prose.
 
 You may ONLY use these tools:
@@ -110,22 +85,22 @@ async function askAI(message: any) {
   };
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (settings.apiKey) headers.Authorization = `Bearer ${settings.apiKey}`;
+  const body: Record<string, unknown> = {
+    model: settings.model,
+    temperature: 0.35,
+    messages: [
+      { role: "system", content: TOOL_CONTRACT },
+      { role: "user", content: `Canvas context:\n${JSON.stringify(context)}\n\nDesign request:\n${String(prompt)}` }
+    ]
+  };
+  // LM Studio defaults to text output. The tool contract requires JSON and
+  // validatePlan enforces it after the response, avoiding incompatible
+  // response_format implementations across locally loaded models.
+  if (!localLmStudio) body.response_format = { type: "json_object" };
   const response = await fetch(settings.endpoint, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model: settings.model,
-      temperature: 0.35,
-      // LM Studio accepts structured output through json_schema, while many
-      // OpenAI-compatible providers still use the json_object shorthand.
-      response_format: localLmStudio
-        ? { type: "json_schema", json_schema: LM_STUDIO_PLAN_SCHEMA }
-        : { type: "json_object" },
-      messages: [
-        { role: "system", content: TOOL_CONTRACT },
-        { role: "user", content: `Canvas context:\n${JSON.stringify(context)}\n\nDesign request:\n${String(prompt)}` }
-      ]
-    })
+    body: JSON.stringify(body)
   });
   if (!response.ok) throw new Error(`AI request failed (${response.status}): ${(await response.text()).slice(0, 240)}`);
   const payload = await response.json();

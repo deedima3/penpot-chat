@@ -31,7 +31,7 @@ Open **Canvas Copilot**, expand **AI connection**, and supply an OpenAI-compatib
 
 Start LM Studio's server from its **Developer** tab, then open **AI connection** in Canvas Copilot and select **Connect local**. The plugin discovers your first available model at `http://localhost:1234/v1/models`, selects it, and uses LM Studio's OpenAI-compatible chat-completions endpoint. No API key is required unless you explicitly enabled LM Studio API authentication.
 
-Canvas Copilot requests a JSON Schema response from LM Studio, so use a model that supports structured output/tool use for the most reliable design plans.
+Canvas Copilot uses LM Studio's normal text response mode and validates the JSON-only design plan before showing it, so it works with locally loaded chat models that do not expose structured-output settings.
 
 After an update, remove the existing Canvas Copilot entry in Penpot's Plugin Manager and install the manifest URL again. The manifest uses a versioned plugin filename so Penpot fetches the current build instead of its previously cached script.
 
