@@ -61,6 +61,13 @@ h2 { font-size:25px; line-height:1.08; }
 code { padding:3px 5px; border-radius:3px; color:var(--coral); background:var(--paper-deep); font:9px "DM Mono", monospace; }
 .settings-body { display:grid; gap:8px; }
 .settings-body > p { margin:0 0 2px; }
+.local-ai-callout { display:flex; gap:10px; align-items:center; padding:10px; border:1px solid color-mix(in srgb, var(--coral) 55%, var(--line)); border-radius:7px; background:linear-gradient(110deg, color-mix(in srgb, var(--coral) 10%, transparent), transparent); }
+.local-ai-callout > div { min-width:0; display:grid; grid-template-columns:15px 1fr; column-gap:5px; align-items:center; }
+.local-ai-callout strong { font-size:10px; font-weight:500; }
+.local-ai-callout small { grid-column:2; color:var(--muted); font-size:8px; line-height:1.4; }
+.local-mark { grid-row:1 / span 2; color:var(--coral); font-size:13px; }
+.local-connect { margin-left:auto; flex:none; padding:5px 7px; color:var(--ink); border:1px solid var(--ink); border-radius:4px; background:var(--lime); font-size:9px; }
+.local-connect:hover { transform:translateY(-1px); box-shadow:2px 2px 0 var(--coral); }
 .settings-body label { display:grid; gap:3px; color:var(--ink); font-size:9px; }
 .settings-body input { width:100%; padding:7px; color:var(--ink); border:1px solid var(--line); border-radius:5px; outline-color:var(--coral); background:var(--paper); font-size:10px; }
 .save-settings { justify-self:start; margin-top:3px; font-size:10px; }

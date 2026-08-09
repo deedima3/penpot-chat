@@ -75,16 +75,19 @@ function validatePlan(value: unknown): Plan {
 
 async function askAI(message: any) {
   const { prompt, settings } = message;
-  if (!settings?.endpoint || !settings?.model || !settings?.apiKey) throw new Error("Add an endpoint, model, and API key in AI connection first.");
+  const localLmStudio = /^https?:\/\/(localhost|127\.0\.0\.1):1234\/v1\//.test(settings?.endpoint || "");
+  if (!settings?.endpoint || !settings?.model || (!settings?.apiKey && !localLmStudio)) throw new Error("Add an endpoint, model, and API key—or connect LM Studio local mode—first.");
   const context = {
     page: { name: penpot.currentPage?.name },
     selection: (penpot.selection || []).map((shape: any) => summarizeShape(shape)),
     topLevel: (penpot.currentPage?.root?.children || []).slice(0, 24).map((shape: any) => summarizeShape(shape)),
     viewportCenter: penpot.viewport?.center
   };
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (settings.apiKey) headers.Authorization = `Bearer ${settings.apiKey}`;
   const response = await fetch(settings.endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${settings.apiKey}` },
+    headers,
     body: JSON.stringify({
       model: settings.model,
       temperature: 0.35,
@@ -100,6 +103,14 @@ async function askAI(message: any) {
   const content = payload?.choices?.[0]?.message?.content;
   if (typeof content !== "string") throw new Error("The AI endpoint returned no chat-completions message.");
   return validatePlan(cleanJson(content));
+}
+
+async function listLmStudioModels(endpoint: string) {
+  if (!/^https?:\/\/(localhost|127\.0\.0\.1):1234\/v1\/models$/.test(endpoint)) throw new Error("LM Studio model lookup is limited to localhost:1234.");
+  const response = await fetch(endpoint);
+  if (!response.ok) throw new Error("Could not reach LM Studio. Start the Local Server from LM Studio’s Developer tab.");
+  const payload = await response.json();
+  return Array.isArray(payload?.data) ? payload.data.map((model: any) => model.id).filter((id: unknown) => typeof id === "string") : [];
 }
 
 function hexFill(hex?: string) {
@@ -187,6 +198,7 @@ penpot.ui.onMessage(async (message: any) => {
   try {
     if (message?.type === "get-context") sendContext();
     else if (message?.type === "request-ai") penpot.ui.sendMessage({ source: "canvas-copilot", type: "ai-result", plan: await askAI(message) });
+    else if (message?.type === "list-lmstudio-models") penpot.ui.sendMessage({ source: "canvas-copilot", type: "lmstudio-models", models: await listLmStudioModels(message.endpoint) });
     else if (message?.type === "apply-plan") penpot.ui.sendMessage({ source: "canvas-copilot", type: "apply-result", message: await execute(validatePlan(message.plan)) });
   } catch (error) {
     penpot.ui.sendMessage({ source: "canvas-copilot", type: "error", message: error instanceof Error ? error.message : "Unexpected plugin error." });

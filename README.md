@@ -27,6 +27,10 @@ http://localhost:4400/manifest.json
 
 Open **Canvas Copilot**, expand **AI connection**, and supply an OpenAI-compatible chat-completions URL, model name, and API key. The browser stores these values only in the plugin's local storage.
 
+### Use LM Studio locally
+
+Start LM Studio's server from its **Developer** tab, then open **AI connection** in Canvas Copilot and select **Connect local**. The plugin discovers your first available model at `http://localhost:1234/v1/models`, selects it, and uses LM Studio's OpenAI-compatible chat-completions endpoint. No API key is required unless you explicitly enabled LM Studio API authentication.
+
 ## Deploy with GitHub Pages
 
 The production bundle is committed in `docs/`, which GitHub Pages can serve directly from the repository—no Actions deployment token is needed.

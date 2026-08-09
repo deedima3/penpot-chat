@@ -19,12 +19,15 @@ function notify(message: string, type = "") {
   window.setTimeout(() => toast.classList.remove("is-visible"), 4200);
 }
 function settings(): Settings { return { endpoint: inputs.endpoint.value.trim(), model: inputs.model.value.trim(), apiKey: inputs.apiKey.value.trim() }; }
+function isLmStudio(connection: Settings = settings()) { return /^https?:\/\/(localhost|127\.0\.0\.1):1234\/v1\//.test(connection.endpoint); }
+function isConfigured(connection: Settings = settings()) { return Boolean(connection.endpoint && connection.model && (connection.apiKey || isLmStudio(connection))); }
+function updateConnectionLabel() { const connection = settings(); $("#connection-label").textContent = isConfigured(connection) ? `${isLmStudio(connection) ? "Local ·" : "Ready ·"} ${connection.model}` : "AI not configured"; }
 function setWorking(working: boolean, label = "Generate plan") {
   isWorking = working; const button = $("#generate") as HTMLButtonElement; button.disabled = working; button.querySelector("span")!.textContent = label;
 }
 function saveSettings() {
   localStorage.setItem("canvas-copilot-settings", JSON.stringify(settings()));
-  $("#connection-label").textContent = inputs.apiKey.value ? `Ready · ${inputs.model.value}` : "AI not configured";
+  updateConnectionLabel();
   notify("AI connection saved locally.");
 }
 function readSettings() {
@@ -32,7 +35,7 @@ function readSettings() {
     const saved = JSON.parse(localStorage.getItem("canvas-copilot-settings") || "{}") as Partial<Settings>;
     inputs.endpoint.value = saved.endpoint || inputs.endpoint.value; inputs.model.value = saved.model || inputs.model.value; inputs.apiKey.value = saved.apiKey || "";
   } catch { /* ignore corrupt local preferences */ }
-  $("#connection-label").textContent = inputs.apiKey.value ? `Ready · ${inputs.model.value}` : "AI not configured";
+  updateConnectionLabel();
 }
 function renderPlan(plan: Plan) {
   pendingPlan = plan; $("#plan-title").textContent = plan.title; $("#plan-summary").textContent = plan.summary;
@@ -45,13 +48,21 @@ function renderPlan(plan: Plan) {
 function generate() {
   if (isWorking) return;
   if (!prompt.value.trim()) return notify("Describe a design or select layers to refine.", "is-error");
-  const connection = settings(); if (!connection.apiKey || !connection.endpoint || !connection.model) return notify("Set up your AI connection first.", "is-error");
+  const connection = settings(); if (!isConfigured(connection)) return notify("Set up an AI connection, or use LM Studio local mode.", "is-error");
   setWorking(true, "Thinking…"); send({ type: "request-ai", prompt: prompt.value.trim(), settings: connection });
 }
 
 $("#generate").addEventListener("click", generate);
 prompt.addEventListener("keydown", (event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") generate(); });
 $("#save-settings").addEventListener("click", saveSettings);
+$("#lmstudio-connect").addEventListener("click", () => {
+  inputs.endpoint.value = "http://localhost:1234/v1/chat/completions";
+  inputs.apiKey.value = "";
+  inputs.model.value = "";
+  updateConnectionLabel();
+  notify("Looking for models in LM Studio…");
+  send({ type: "list-lmstudio-models", endpoint: "http://localhost:1234/v1/models" });
+});
 $("#refresh-context").addEventListener("click", () => send({ type: "get-context" }));
 $("#discard").addEventListener("click", () => { pendingPlan = null; planBox.classList.add("is-hidden"); });
 $("#apply").addEventListener("click", () => { if (!pendingPlan) return; ($("#apply") as HTMLButtonElement).disabled = true; send({ type: "apply-plan", plan: pendingPlan }); });
@@ -64,6 +75,11 @@ window.addEventListener("message", (event) => {
     const selected = message.context.selection || []; $("#selection-title").textContent = selected.length ? `${selected.length} layer${selected.length === 1 ? "" : "s"} selected` : `Page: ${message.context.page?.name || "Untitled"}`;
     $("#selection-detail").textContent = selected.length ? selected.map((layer: any) => `${layer.name || layer.type} · ${layer.width}×${layer.height}`).join("  /  ") : `${(message.context.topLevel || []).length} top-level layers available to the assistant`;
   } else if (message.type === "ai-result") { setWorking(false); renderPlan(message.plan); }
+  else if (message.type === "lmstudio-models") {
+    const models = Array.isArray(message.models) ? message.models : [];
+    if (!models.length) return notify("LM Studio is running, but no models are loaded.", "is-error");
+    inputs.model.value = String(models[0]); saveSettings(); notify(`LM Studio connected · ${models[0]}`);
+  }
   else if (message.type === "apply-result") { ($("#apply") as HTMLButtonElement).disabled = false; notify(message.message); pendingPlan = null; planBox.classList.add("is-hidden"); }
   else if (message.type === "error") { setWorking(false); ($("#apply") as HTMLButtonElement).disabled = false; notify(message.message, "is-error"); }
   else if (message.type === "themechange") document.body.dataset.theme = message.theme;

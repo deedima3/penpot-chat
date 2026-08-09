@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Canvas Copilot</title>
-    <script type="module" crossorigin src="./assets/index-DhJY3RZV.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DNRjzxN9.css">
+    <script type="module" crossorigin src="./assets/index-uGD8odnG.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-CHbjn94S.css">
   </head>
   <body>
     <main class="shell">
@@ -61,10 +61,11 @@
       <section class="settings">
         <button class="guide-trigger" id="settings-toggle" aria-expanded="false"><span>AI connection</span><span>⌄</span></button>
         <div class="settings-body" id="settings-body" hidden>
+          <div class="local-ai-callout"><div><span class="local-mark">◉</span><strong>Run with LM Studio</strong><small>Use the local server on port 1234. No key required by default.</small></div><button class="local-connect" id="lmstudio-connect">Connect local</button></div>
           <p>Use an OpenAI-compatible chat-completions endpoint. Your key is stored only in this plugin’s local storage.</p>
           <label>Endpoint <input id="endpoint" type="url" value="https://api.openai.com/v1/chat/completions" /></label>
           <label>Model <input id="model" type="text" value="gpt-4.1-mini" /></label>
-          <label>API key <input id="api-key" type="password" autocomplete="off" placeholder="sk-…" /></label>
+          <label>API key <input id="api-key" type="password" autocomplete="off" placeholder="Optional for LM Studio" /></label>
           <button class="secondary save-settings" id="save-settings">Save connection</button>
         </div>
       </section>
