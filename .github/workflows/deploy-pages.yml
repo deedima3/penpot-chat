@@ -1,4 +1,4 @@
-name: Deploy Penpot plugin to GitHub Pages
+name: Verify Penpot plugin build
 
 on:
   push:
@@ -7,18 +7,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -35,19 +26,3 @@ jobs:
 
       - name: Build plugin
         run: npm run build
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v6
-        with:
-          # First deployment: create the Pages site and select GitHub Actions
-          # as the publishing source if it has not yet been enabled in Settings.
-          enablement: true
-
-      - name: Upload plugin bundle
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4

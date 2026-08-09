@@ -6,7 +6,9 @@ export default defineConfig({
   base: "./",
   publicDir: "public",
   build: {
-    outDir: "dist",
+    // GitHub Pages supports publishing the /docs folder directly from main.
+    // This lets the Penpot manifest, plugin bridge, and iframe UI share one URL.
+    outDir: "docs",
     emptyOutDir: true,
     rollupOptions: {
       input: {

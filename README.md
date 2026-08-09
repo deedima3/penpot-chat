@@ -10,7 +10,7 @@ An AI design agent plugin for Penpot. Describe a design from scratch, or select 
 - Align, distribute, reorder, group, ungroup, or delete the current selection.
 - Work with an OpenAI-compatible `/chat/completions` endpoint; no API key is bundled or committed.
 
-The AI contract and every supported argument are documented in [docs/AI_TOOL_GUIDE.md](docs/AI_TOOL_GUIDE.md). The app deliberately uses a reviewed plan rather than unrestricted AI execution.
+The AI contract and every supported argument are documented in [guides/AI_TOOL_GUIDE.md](guides/AI_TOOL_GUIDE.md). The app deliberately uses a reviewed plan rather than unrestricted AI execution.
 
 ## Run locally
 
@@ -29,18 +29,17 @@ Open **Canvas Copilot**, expand **AI connection**, and supply an OpenAI-compatib
 
 ## Deploy with GitHub Pages
 
-The included [GitHub Pages workflow](.github/workflows/deploy-pages.yml) builds and publishes `dist/` whenever `main` is pushed.
+The production bundle is committed in `docs/`, which GitHub Pages can serve directly from the repository—no Actions deployment token is needed.
 
-1. Create or connect a GitHub repository, commit this project, and push its default branch as `main`.
-2. In GitHub, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
-3. Push to `main` (or run the **Deploy Penpot plugin to GitHub Pages** workflow manually).
-4. Install the resulting manifest in Penpot:
+1. In GitHub, go to **Settings → Pages**.
+2. Set **Source** to **Deploy from a branch**, branch **`main`**, folder **`/docs`**, then save.
+3. Install the resulting manifest in Penpot:
 
    ```text
    https://<github-user>.github.io/<repository-name>/manifest.json
    ```
 
-The build uses relative asset URLs, so `manifest.json` always resolves `plugin.js` and `icon.svg` correctly from a Pages project URL.
+The build uses relative asset URLs, so `manifest.json` resolves `plugin.js`, `icon.svg`, and the plugin iframe correctly from the Pages URL. Run `npm run build` before committing any future plugin changes; the included workflow verifies this build on every push.
 
 ## Architecture
 
