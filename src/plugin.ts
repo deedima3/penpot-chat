@@ -12,6 +12,31 @@ const ALLOWED_TOOLS = new Set([
   "create_svg", "update_selection", "arrange_selection", "group_selection", "ungroup_selection", "delete_selection"
 ]);
 
+const LM_STUDIO_PLAN_SCHEMA = {
+  name: "penpot_execution_plan",
+  strict: false,
+  schema: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      summary: { type: "string" },
+      operations: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            tool: { type: "string", enum: [...ALLOWED_TOOLS] },
+            label: { type: "string" },
+            args: { type: "object" }
+          },
+          required: ["tool", "args"]
+        }
+      }
+    },
+    required: ["title", "summary", "operations"]
+  }
+};
+
 const TOOL_CONTRACT = `You are Canvas Copilot, a careful Penpot design agent. Turn the user's request into a small, editable Penpot execution plan. You do not manipulate pixels or output prose.
 
 You may ONLY use these tools:
@@ -91,7 +116,11 @@ async function askAI(message: any) {
     body: JSON.stringify({
       model: settings.model,
       temperature: 0.35,
-      response_format: { type: "json_object" },
+      // LM Studio accepts structured output through json_schema, while many
+      // OpenAI-compatible providers still use the json_object shorthand.
+      response_format: localLmStudio
+        ? { type: "json_schema", json_schema: LM_STUDIO_PLAN_SCHEMA }
+        : { type: "json_object" },
       messages: [
         { role: "system", content: TOOL_CONTRACT },
         { role: "user", content: `Canvas context:\n${JSON.stringify(context)}\n\nDesign request:\n${String(prompt)}` }
